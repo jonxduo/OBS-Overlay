@@ -1,0 +1,31 @@
+{
+  "title": "timer",
+  "config_params": {
+    "fields": [
+      {
+        "name": "hours",
+        "label": "Ore",
+        "type": "number",
+        "required": true,
+        "default": 0
+      },
+      {
+        "name": "minutes",
+        "label": "Minuti",
+        "type": "number",
+        "required": true,
+        "default": 1
+      },
+      {
+        "name": "seconds",
+        "label": "Secondi",
+        "type": "number",
+        "required": true,
+        "default": 30
+      }
+    ]
+  },
+  "html": "<div class=\"timer-wrap\"><span id=\"timer-h\">00</span><span>:</span><span id=\"timer-m\">00</span><span>:</span><span id=\"timer-s\">00</span></div>",
+  "css": ".timer-wrap{display:flex;gap:8px;align-items:center;justify-content:center;width:100vw;height:100vh;font-family:\"Space Grotesk\",\"Segoe UI\",sans-serif;font-size:72px;font-weight:700;color:#ffffff;background:transparent;text-shadow:0 0 12px rgba(0,0,0,.6);}#timer-h,#timer-m,#timer-s{min-width:80px;text-align:center;}",
+  "js": "function createOverlayThemeController(root, config, helpers){\n  let intervalId = null;\n  let currentConfig = {...(config || {})};\n  let remaining = 0;\n\n  function clamp(n){\n    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;\n  }\n\n  function readDuration(cfg){\n    const h = clamp(Number(cfg.hours ?? 0));\n    const m = clamp(Number(cfg.minutes ?? 0));\n    const s = clamp(Number(cfg.seconds ?? 0));\n    return h * 3600 + m * 60 + s;\n  }\n\n  function pad(v){\n    return String(v).padStart(2, '0');\n  }\n\n  function render(){\n    const h = Math.floor(remaining / 3600);\n    const m = Math.floor((remaining % 3600) / 60);\n    const s = Math.floor(remaining % 60);\n    helpers.setText('#timer-h', pad(h));\n    helpers.setText('#timer-m', pad(m));\n    helpers.setText('#timer-s', pad(s));\n  }\n\n  function start(){\n    if(intervalId) return;\n    intervalId = setInterval(() => {\n      if(remaining <= 0){\n        stop();\n        return;\n      }\n      remaining -= 1;\n      render();\n    }, 1000);\n  }\n\n  function stop(){\n    if(intervalId){\n      clearInterval(intervalId);\n      intervalId = null;\n    }\n  }\n\n  function restart(){\n    stop();\n    remaining = readDuration(currentConfig);\n    render();\n    start();\n  }\n\n  function updateConfig(next){\n    currentConfig = {...(next || {})};\n    if(!intervalId){\n      remaining = readDuration(currentConfig);\n      render();\n    }\n  }\n\n  remaining = readDuration(currentConfig);\n  render();\n\n  return { start, stop, restart, updateConfig, destroy: stop };\n}"
+}

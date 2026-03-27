@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.pyc
+obs-overlay/obs_overlay.db
+obs-panel/node_modules/
+obs-panel/dist/
+.DS_Store
+obs-overlay/mediamtx/bin/

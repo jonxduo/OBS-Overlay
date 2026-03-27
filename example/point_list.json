@@ -1,0 +1,35 @@
+{
+  "title": "point_list",
+  "config_params": {
+    "fields": [
+      {
+        "name": "points_json",
+        "label": "Points JSON (array di oggetti {title,content})",
+        "type": "nested",
+        "required": true,
+        "item": {
+          "type": "object",
+          "fields": [
+            {
+              "name": "title",
+              "label": "Titolo",
+              "type": "text",
+              "required": false,
+              "default": ""
+            },
+            {
+              "name": "content",
+              "label": "Contenuto",
+              "type": "textarea",
+              "required": false,
+              "default": ""
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "html": "<div class=\"points-wrap\"><ul id=\"points-list\" class=\"points-list\"></ul></div>",
+  "css": ".points-wrap{width:100vw;height:100vh;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:28px 40px;font-family:\"Space Grotesk\",\"Segoe UI\",sans-serif;color:#fff;background:transparent;}.points-list{margin:0;padding-left:28px;display:grid;gap:22px;list-style-position:outside;}.point-item{font-size:32px;line-height:1.2;text-shadow:0 0 10px rgba(0,0,0,.55);visibility:hidden;}.point-item strong,.point-item span{display:block;opacity:0;transform:translateY(14px);}.point-item strong{font-size:34px;}.point-item span{font-size:24px;}.point-item.point-shown{visibility:visible;}.point-item.point-shown strong{opacity:1;transform:translateY(0);}.point-item.point-shown span{opacity:.95;transform:translateY(0);}.point-item.point-enter{visibility:visible;}.point-item.point-enter strong{animation:pointTitleIn .42s cubic-bezier(.2,.8,.2,1) forwards;}.point-item.point-enter span{animation:pointContentIn .5s cubic-bezier(.2,.8,.2,1) .12s forwards;}.point-item.point-exit{visibility:visible;}.point-item.point-exit strong{animation:pointTitleOut .3s cubic-bezier(.4,0,.2,1) var(--exit-delay,0ms) forwards;}.point-item.point-exit span{animation:pointContentOut .34s cubic-bezier(.4,0,.2,1) calc(var(--exit-delay,0ms) + 40ms) forwards;}@keyframes pointTitleIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}@keyframes pointContentIn{from{opacity:0;transform:translateY(12px);}to{opacity:.95;transform:translateY(0);}}@keyframes pointTitleOut{from{opacity:1;transform:translateY(0);}to{opacity:0;transform:translateY(-8px);}}@keyframes pointContentOut{from{opacity:.95;transform:translateY(0);}to{opacity:0;transform:translateY(-10px);}}",
+  "js": "function createOverlayThemeController(root, config, helpers){\n  let currentConfig = {...(config || {})};\n  let points = [];\n  let visibleCount = 0;\n  let listEl = null;\n  let exitTimer = null;\n  const enterTimers = new Set();\n\n  function normalizePoint(item){\n    if(!item || typeof item !== 'object') return null;\n    const title = String(item.title ?? '').trim();\n    const content = String(item.content ?? '').trim();\n    if(!title && !content) return null;\n    return { title, content };\n  }\n\n  function parsePoints(cfg){\n    if(Array.isArray(cfg?.points)){\n      return cfg.points.map(normalizePoint).filter(Boolean);\n    }\n\n    if(Array.isArray(cfg?.points_json)){\n      return cfg.points_json.map(normalizePoint).filter(Boolean);\n    }\n\n    const raw = String(cfg?.points_json ?? '').trim();\n    if(!raw){\n      return [];\n    }\n\n    try{\n      const parsed = JSON.parse(raw);\n      if(!Array.isArray(parsed)) return [];\n      return parsed.map(normalizePoint).filter(Boolean);\n    }catch(_err){\n      return [];\n    }\n  }\n\n  function escapeHtml(value){\n    return String(value)\n      .replaceAll('&', '&amp;')\n      .replaceAll('<', '&lt;')\n      .replaceAll('>', '&gt;')\n      .replaceAll('\\\"', '&quot;')\n      .replaceAll(\"'\", '&#39;');\n  }\n\n  function clearAnimationTimers(){\n    enterTimers.forEach((timerId) => clearTimeout(timerId));\n    enterTimers.clear();\n    if(exitTimer){\n      clearTimeout(exitTimer);\n      exitTimer = null;\n    }\n  }\n\n  function setRowShown(row){\n    if(!row) return;\n    row.classList.remove('point-enter', 'point-exit');\n    row.style.removeProperty('--exit-delay');\n    row.classList.add('point-shown');\n  }\n\n  function buildList(){\n    listEl = root.querySelector('#points-list');\n    if(!listEl) return;\n\n    clearAnimationTimers();\n\n    listEl.innerHTML = points.map((p, idx) => {\n      const titleHtml = p.title ? '<strong>' + escapeHtml(p.title) + '</strong>' : '';\n      const contentHtml = p.content ? '<span>' + escapeHtml(p.content) + '</span>' : '';\n      return '<li class=\\\"point-item\\\" data-index=\\\"' + idx + '\\\">' + titleHtml + contentHtml + '</li>';\n    }).join('');\n\n    for(let i = 0; i < visibleCount; i += 1){\n      setRowShown(listEl.children[i]);\n    }\n  }\n\n  function revealNext(){\n    if(!listEl) return;\n    if(visibleCount >= points.length) return;\n\n    const row = listEl.children[visibleCount];\n    if(!row) return;\n\n    row.classList.remove('point-shown', 'point-exit');\n    row.style.removeProperty('--exit-delay');\n    row.classList.add('point-enter');\n    visibleCount += 1;\n\n    const timerId = setTimeout(() => {\n      row.classList.remove('point-enter');\n      row.classList.add('point-shown');\n      enterTimers.delete(timerId);\n    }, 720);\n\n    enterTimers.add(timerId);\n  }\n\n  function start(){\n    revealNext();\n  }\n\n  function stop(){\n    if(!listEl || visibleCount <= 0) return;\n\n    clearAnimationTimers();\n\n    const rows = Array.from(listEl.children).slice(0, visibleCount);\n    rows.forEach((row, idx) => {\n      row.classList.remove('point-enter', 'point-shown');\n      row.style.setProperty('--exit-delay', (idx * 80) + 'ms');\n      row.classList.add('point-exit');\n    });\n\n    const total = rows.length * 80 + 420;\n    exitTimer = setTimeout(() => {\n      rows.forEach((row) => {\n        row.classList.remove('point-exit');\n        row.style.removeProperty('--exit-delay');\n      });\n      visibleCount = 0;\n      exitTimer = null;\n    }, total);\n  }\n\n  function restart(){\n    clearAnimationTimers();\n    visibleCount = 0;\n    if(!listEl) return;\n    Array.from(listEl.children).forEach((row) => {\n      row.classList.remove('point-enter', 'point-exit', 'point-shown');\n      row.style.removeProperty('--exit-delay');\n    });\n  }\n\n  function updateConfig(next){\n    currentConfig = {...(next || {})};\n    points = parsePoints(currentConfig);\n    if(visibleCount > points.length){\n      visibleCount = points.length;\n    }\n    buildList();\n  }\n\n  points = parsePoints(currentConfig);\n  buildList();\n\n  return {\n    start,\n    stop,\n    restart,\n    updateConfig,\n    destroy: function(){\n      clearAnimationTimers();\n    }\n  };\n}"
+}
