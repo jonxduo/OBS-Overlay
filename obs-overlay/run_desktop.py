@@ -2,10 +2,12 @@ import atexit
 import signal
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 from pathlib import Path
 
+import uvicorn
 import webview
 
 
@@ -13,6 +15,8 @@ HOST = "127.0.0.1"
 PORT = 8000
 APP_DIR = Path(__file__).resolve().parent
 api_process: subprocess.Popen | None = None
+api_server: uvicorn.Server | None = None
+api_thread: threading.Thread | None = None
 
 
 def _api_url(path: str) -> str:
@@ -30,7 +34,19 @@ def _stop_mediamtx_via_api() -> None:
 
 
 def _start_api() -> None:
-    global api_process
+    global api_process, api_server, api_thread
+
+    if getattr(sys, "frozen", False):
+        def _run_embedded_api() -> None:
+            global api_server
+            config = uvicorn.Config("app.main:app", host=HOST, port=PORT, log_level="warning")
+            api_server = uvicorn.Server(config)
+            api_server.run()
+
+        api_thread = threading.Thread(target=_run_embedded_api, daemon=True)
+        api_thread.start()
+        return
+
     api_process = subprocess.Popen(
         [
             sys.executable,
@@ -47,11 +63,21 @@ def _start_api() -> None:
 
 
 def _stop_api() -> None:
-    global api_process
-    if api_process is None:
-        return
+    global api_process, api_server, api_thread
 
     _stop_mediamtx_via_api()
+
+    if getattr(sys, "frozen", False):
+        if api_server is not None:
+            api_server.should_exit = True
+        if api_thread is not None and api_thread.is_alive():
+            api_thread.join(timeout=5)
+        api_server = None
+        api_thread = None
+        return
+
+    if api_process is None:
+        return
 
     if api_process.poll() is None:
         api_process.terminate()

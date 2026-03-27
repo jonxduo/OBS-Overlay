@@ -4,10 +4,7 @@ import platform
 import shutil
 import socket
 import subprocess
-import tarfile
-import tempfile
 import time
-import urllib.request
 
 from fastapi import HTTPException
 
@@ -16,7 +13,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIAMTX_DIR = BASE_DIR / "mediamtx"
 MEDIAMTX_BIN_DIR = MEDIAMTX_DIR / "bin"
 MEDIAMTX_CONFIG = MEDIAMTX_DIR / "mediamtx.yml"
-MEDIAMTX_VERSION = "1.9.3"
 RTMP_STREAM_PATH = "live/obs"
 _mediamtx_process: subprocess.Popen | None = None
 
@@ -32,10 +28,19 @@ def _get_lan_ip() -> str:
         sock.close()
 
 
-def _download_mediamtx_binary() -> Path:
-    MEDIAMTX_BIN_DIR.mkdir(parents=True, exist_ok=True)
-
+def _platform_arch_key() -> tuple[str, str, str]:
+    system = platform.system().lower()
     machine = platform.machine().lower()
+
+    if system in {"darwin", "mac", "macos"}:
+        os_key = "darwin"
+    elif system in {"linux"}:
+        os_key = "linux"
+    elif system in {"windows"}:
+        os_key = "windows"
+    else:
+        raise RuntimeError(f"Unsupported OS for MediaMTX: {system}")
+
     if machine in {"arm64", "aarch64"}:
         arch = "arm64"
     elif machine in {"x86_64", "amd64"}:
@@ -43,41 +48,47 @@ def _download_mediamtx_binary() -> Path:
     else:
         raise RuntimeError(f"Unsupported architecture for MediaMTX: {machine}")
 
-    if platform.system() != "Darwin":
-        raise RuntimeError("Automatic MediaMTX download currently supports only macOS in this project")
+    exe_name = "mediamtx.exe" if os_key == "windows" else "mediamtx"
+    return os_key, arch, exe_name
 
-    archive_name = f"mediamtx_v{MEDIAMTX_VERSION}_darwin_{arch}.tar.gz"
-    download_url = f"https://github.com/bluenviron/mediamtx/releases/download/v{MEDIAMTX_VERSION}/{archive_name}"
 
-    with tempfile.TemporaryDirectory() as tmp:
-        archive_path = Path(tmp) / archive_name
-        urllib.request.urlretrieve(download_url, archive_path)
-        with tarfile.open(archive_path, "r:gz") as tar:
-            for member in tar.getmembers():
-                member_path = MEDIAMTX_BIN_DIR / member.name
-                if not member_path.resolve().is_relative_to(MEDIAMTX_BIN_DIR.resolve()):
-                    raise RuntimeError("Unsafe path found in MediaMTX archive")
-            tar.extractall(path=MEDIAMTX_BIN_DIR)
+def _bundled_binary_candidates() -> list[Path]:
+    os_key, arch, exe_name = _platform_arch_key()
 
-    for candidate in [MEDIAMTX_BIN_DIR / "mediamtx", MEDIAMTX_BIN_DIR / "mtx"]:
-        if candidate.exists():
-            candidate.chmod(0o755)
-            return candidate
+    return [
+        MEDIAMTX_BIN_DIR / f"{os_key}-{arch}" / exe_name,
+        MEDIAMTX_BIN_DIR / os_key / arch / exe_name,
+        MEDIAMTX_BIN_DIR / exe_name,
+        MEDIAMTX_DIR / exe_name,
+    ]
 
-    raise RuntimeError("MediaMTX binary not found after extraction")
 
+def _prepare_executable(path: Path) -> str:
+    if platform.system().lower() != "windows":
+        path.chmod(0o755)
+    return str(path)
 
 def _resolve_mediamtx_binary() -> str:
-    bundled = MEDIAMTX_BIN_DIR / "mediamtx"
-    if bundled.exists():
-        return str(bundled)
+    MEDIAMTX_BIN_DIR.mkdir(parents=True, exist_ok=True)
+
+    for candidate in _bundled_binary_candidates():
+        if candidate.exists():
+            return _prepare_executable(candidate)
 
     from_path = shutil.which("mediamtx")
     if from_path:
         return from_path
 
-    downloaded = _download_mediamtx_binary()
-    return str(downloaded)
+    mtx_from_path = shutil.which("mtx")
+    if mtx_from_path:
+        return mtx_from_path
+
+    os_key, arch, exe_name = _platform_arch_key()
+    raise RuntimeError(
+        "MediaMTX binary not found. "
+        f"Expected bundled binary at '{MEDIAMTX_BIN_DIR / f'{os_key}-{arch}' / exe_name}' "
+        "or install 'mediamtx' in PATH."
+    )
 
 
 def _stop_mediamtx() -> None:
@@ -152,7 +163,10 @@ def start_rtmp_server() -> dict[str, str | bool]:
     if _mediamtx_process is not None and _mediamtx_process.poll() is None:
         return get_rtmp_status()
 
-    binary = _resolve_mediamtx_binary()
+    try:
+        binary = _resolve_mediamtx_binary()
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
     MEDIAMTX_DIR.mkdir(parents=True, exist_ok=True)
 
     _mediamtx_process = subprocess.Popen(

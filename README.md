@@ -10,6 +10,17 @@ Stack richiesto:
 - `obs-overlay/` backend FastAPI + launcher desktop
 - `obs-panel/` frontend React
 
+MediaMTX bundled binaries:
+- I binari di MediaMTX possono essere mantenuti nel repository sotto `obs-overlay/mediamtx/bin/`.
+- Layout consigliato multi piattaforma:
+	- `obs-overlay/mediamtx/bin/darwin-amd64/mediamtx`
+	- `obs-overlay/mediamtx/bin/darwin-arm64/mediamtx`
+	- `obs-overlay/mediamtx/bin/linux-amd64/mediamtx`
+	- `obs-overlay/mediamtx/bin/linux-arm64/mediamtx`
+	- `obs-overlay/mediamtx/bin/windows-amd64/mediamtx.exe`
+	- `obs-overlay/mediamtx/bin/windows-arm64/mediamtx.exe`
+- Il backend seleziona automaticamente il binario corretto in base a OS + architettura.
+
 ## Avvio locale
 
 ### 1) Backend API
@@ -25,6 +36,10 @@ Health check:
 ```bash
 curl http://127.0.0.1:8000/api/health
 ```
+
+Nota RTMP:
+- Se il binario bundle per la piattaforma corrente non e` presente, il backend prova `mediamtx`/`mtx` dal `PATH`.
+- Se non trova nulla, l'API RTMP ritorna errore con il path atteso del binario.
 
 ### 2) Frontend Dev
 
@@ -70,6 +85,34 @@ Dopo la build, FastAPI serve anche l'SPA direttamente.
 cd obs-overlay
 ../.venv/bin/python run_desktop.py
 ```
+
+### 5) Build eseguibile desktop per OS selezionato
+
+E` disponibile uno script di build unico:
+
+```bash
+./.venv/bin/python scripts/build_desktop.py --target macos
+./.venv/bin/python scripts/build_desktop.py --target linux
+./.venv/bin/python scripts/build_desktop.py --target windows
+```
+
+Output:
+- `dist/macos/OBS-Overlay-macos/`
+- `dist/linux/OBS-Overlay-linux/`
+- `dist/windows/OBS-Overlay-windows/`
+
+Avvio senza terminale:
+- La build desktop viene generata in modalita` GUI (senza console).
+- Su macOS avvia il bundle `.app` dentro `dist/macos/OBS-Overlay-macos/` con doppio click dal Finder.
+- Su Windows avvia l'eseguibile `.exe` dal dist senza finestra console.
+
+Note importanti:
+- La cross-build locale non e` supportata: il target deve corrispondere all'OS host.
+- Esempio: `--target windows` va eseguito su Windows.
+- Lo script esegue automaticamente:
+	- build frontend (`npm run build`)
+	- install dipendenze backend + `pyinstaller`
+	- packaging desktop con risorse `app`, `mediamtx`, `obs-panel/dist`
 
 ## API principali
 

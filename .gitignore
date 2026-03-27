@@ -6,3 +6,6 @@ obs-panel/node_modules/
 obs-panel/dist/
 .DS_Store
 obs-overlay/mediamtx/bin/
+build/
+dist/
+*.egg-info/

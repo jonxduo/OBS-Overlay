@@ -36,7 +36,20 @@ app.include_router(overlays_router)
 app.include_router(collections_router)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-FRONTEND_DIST = BASE_DIR.parent / "obs-panel" / "dist"
+
+
+def _resolve_frontend_dist() -> Path:
+    candidates = [
+        BASE_DIR.parent / "obs-panel" / "dist",
+        BASE_DIR / "obs-panel" / "dist",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
+FRONTEND_DIST = _resolve_frontend_dist()
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
 FRONTEND_ASSETS = FRONTEND_DIST / "assets"
 
