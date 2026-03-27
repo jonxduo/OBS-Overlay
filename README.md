@@ -82,3 +82,151 @@ Entita:
 - `overlay`: id, overlay_theme_id, config
 - `collection`: id, title
 - relazione `collection` M2M `overlay`
+
+## Creazione Overlay Theme
+
+Un `overlay_theme` e` composto da:
+- `title`
+- `config_params` (schema del form nel panel)
+- `html` (struttura overlay)
+- `css` (stile overlay)
+- `js` (logica runtime overlay)
+
+La logica JavaScript deve esporre la funzione globale:
+
+```javascript
+function createOverlayThemeController(root, config, helpers) {
+	return {
+		start() {},
+		stop() {},
+		restart() {},
+		updateConfig(next) {},
+		destroy() {}
+	}
+}
+```
+
+### Perche` `createOverlayThemeController` e` importante
+
+Il runtime della pagina source carica il tema e cerca questa funzione.
+Se la funzione non esiste, l'overlay non ha un controller attivo e gli eventi runtime non verranno gestiti.
+
+Parametri:
+- `root`: elemento DOM root dell'overlay (dove renderizzare o cercare nodi)
+- `config`: configurazione iniziale dell'overlay
+- `helpers`: utility disponibili (esempio: `setText(selector, value)`)
+
+Valore di ritorno:
+- oggetto controller con metodi opzionali
+
+### Eventi runtime: `start`, `stop`, `restart`
+
+Dal panel, i pulsanti Start, Stop e Restart inviano un'azione runtime all'overlay.
+Quando arriva un'azione, il runtime invoca il metodo omonimo del controller, se presente:
+- `start()`
+- `stop()`
+- `restart()`
+
+Inoltre:
+- quando cambia la configurazione, viene chiamato `updateConfig(next)`
+- in cleanup/unmount viene chiamato `destroy()`
+
+Esempio minimo valido:
+
+```javascript
+function createOverlayThemeController(root, config, helpers){
+	function start(){
+		console.log('Start event')
+	}
+
+	function stop(){
+		console.log('Stop event')
+	}
+
+	function restart(){
+		console.log('Restart event')
+	}
+
+	function updateConfig(next){
+		console.log('Config updated:', next)
+	}
+
+	return {
+		start,
+		stop,
+		restart,
+		updateConfig,
+		destroy: function(){
+			stop()
+		}
+	}
+}
+```
+
+### Come usare `panel.json` (`config_params`) per generare i form nel panel
+
+Il panel genera i campi dinamicamente da `config_params.fields`.
+Ogni item in `fields` descrive un input.
+
+Esempio:
+
+```json
+{
+	"fields": [
+		{
+			"name": "title",
+			"label": "Titolo",
+			"type": "text",
+			"default": "Hello"
+		},
+		{
+			"name": "visible",
+			"label": "Visibile",
+			"type": "checkbox",
+			"default": true
+		},
+		{
+			"name": "speed",
+			"label": "Velocita",
+			"type": "number",
+			"default": 1
+		},
+		{
+			"name": "mode",
+			"label": "Modalita",
+			"type": "select",
+			"options": ["A", "B", "C"]
+		},
+		{
+			"name": "description",
+			"label": "Descrizione",
+			"type": "textarea",
+			"rows": 4
+		},
+		{
+			"name": "points_json",
+			"label": "Punti",
+			"type": "nested",
+			"item": {
+				"fields": [
+					{ "name": "name", "label": "Nome", "type": "text" },
+					{ "name": "value", "label": "Valore", "type": "number", "default": 0 }
+				]
+			}
+		}
+	]
+}
+```
+
+Tipi principali supportati nel panel:
+- `text`
+- `number`
+- `checkbox`
+- `select`
+- `textarea`
+- `nested` (mini-form con lista di item, pulsante aggiunta e rimozione)
+
+Best practice:
+- mantenere nomi campo stabili (`name`) per compatibilita` con config salvata
+- impostare `default` quando serve un valore iniziale prevedibile
+- usare `nested` per strutture array di oggetti
