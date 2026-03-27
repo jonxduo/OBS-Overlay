@@ -9,6 +9,7 @@ function App() {
   const location = useLocation()
   const isPanelRoute = location.pathname === '/panel'
   const isSourceRoute = location.pathname.startsWith('/source/')
+  const isThemeRoute = location.pathname.startsWith('/themes/')
 
   useEffect(() => {
     document.documentElement.classList.toggle('source-mode', isSourceRoute)
@@ -21,7 +22,17 @@ function App() {
 
   return (
     <div className={isSourceRoute ? 'app-shell app-shell-source' : 'app-shell'}>
-      <main className={isSourceRoute ? 'content content-source' : isPanelRoute ? 'content content-panel' : 'content'}>
+      <main
+        className={
+          isSourceRoute
+            ? 'content content-source'
+            : isPanelRoute
+              ? 'content content-panel'
+              : isThemeRoute
+                ? 'content content-theme'
+                : 'content'
+        }
+      >
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/themes/new" element={<ThemeEditPage />} />

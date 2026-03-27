@@ -2,10 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createOverlayTheme, getOverlayTheme, updateOverlayTheme } from '../api'
 
+const SECTIONS = [
+  { key: 'panel', label: 'panel', field: 'config_params', hint: 'JSON config params' },
+  { key: 'overlay', label: 'overlay.html', field: 'html', hint: 'Contenuto HTML overlay' },
+  { key: 'style', label: 'style.css', field: 'css', hint: 'Stili CSS overlay' },
+  { key: 'functions', label: 'functions.js', field: 'js', hint: 'Funzioni JavaScript overlay' },
+  { key: 'preview', label: 'preview', field: null, hint: 'Anteprima non disponibile' }
+]
+
 export function ThemeEditPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const isNewTheme = !id
+  const [activeSection, setActiveSection] = useState('panel')
   const [form, setForm] = useState({
     title: '',
     config_params: '{"fields":[]}',
@@ -77,41 +86,79 @@ export function ThemeEditPage() {
     }
   }
 
+  const currentSection = SECTIONS.find((section) => section.key === activeSection) ?? SECTIONS[0]
+  const currentValue = currentSection.field ? form[currentSection.field] ?? '' : ''
+
+  function onEditorChange(nextValue) {
+    if (!currentSection.field) return
+    setForm((prev) => ({
+      ...prev,
+      [currentSection.field]: nextValue
+    }))
+  }
+
   return (
-    <div className="home-page">
-      <h1>{isNewTheme ? 'Nuovo Tema' : 'Modifica Tema'}</h1>
-      <div className="quick-links">
-        <Link to="/">Torna alla home</Link>
-        <button type="button" onClick={onExportTheme}>
-          Esporta tema JSON
-        </button>
-      </div>
+    <div className="home-page theme-editor-page">
+      {status && <p className="status">{status}</p>}
 
-      <p className="status">{status}</p>
+      <form className="card theme-editor-card" onSubmit={onSave}>
+        <div className="theme-editor-topbar">
+          <Link to="/" className="panel-btn theme-link-btn">
+            <i className="fa-solid fa-arrow-left" /> Home
+          </Link>
+          <input
+            className="theme-title-input"
+            placeholder="Titolo tema"
+            value={form.title}
+            onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+            required
+          />
+          <button type="submit" className="panel-btn">
+            <i className="fa-solid fa-floppy-disk" /> Save
+          </button>
+          <button type="button" className="panel-btn" onClick={onExportTheme}>
+            <i className="fa-solid fa-file-export" /> Export
+          </button>
+        </div>
 
-      <form className="card" onSubmit={onSave}>
-        <label>
-          Titolo
-          <input value={form.title} onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))} required />
-        </label>
-        <label>
-          Config Params JSON
-          <textarea rows="6" value={form.config_params} onChange={(e) => setForm((prev) => ({ ...prev, config_params: e.target.value }))} />
-        </label>
-        <label>
-          HTML
-          <textarea rows="5" value={form.html} onChange={(e) => setForm((prev) => ({ ...prev, html: e.target.value }))} />
-        </label>
-        <label>
-          CSS
-          <textarea rows="5" value={form.css} onChange={(e) => setForm((prev) => ({ ...prev, css: e.target.value }))} />
-        </label>
-        <label>
-          JS
-          <textarea rows="8" value={form.js} onChange={(e) => setForm((prev) => ({ ...prev, js: e.target.value }))} />
-        </label>
+        <div className="theme-editor-layout">
+          <aside className="theme-editor-sidebar">
+            {SECTIONS.map((section) => (
+              <button
+                key={section.key}
+                type="button"
+                className={`theme-section-btn ${activeSection === section.key ? 'active' : ''}`}
+                onClick={() => setActiveSection(section.key)}
+              >
+                {section.label}
+              </button>
+            ))}
+          </aside>
 
-        <button type="submit">{isNewTheme ? 'Crea tema' : 'Salva modifiche'}</button>
+          <section className="theme-editor-main">
+            <div className="theme-editor-main-head">
+              <strong>{currentSection.label}</strong>
+              {!isNewTheme && <span>ID tema: {id}</span>}
+            </div>
+
+            {currentSection.key === 'preview' ? (
+              <div className="theme-preview-placeholder">Preview non ancora disponibile.</div>
+            ) : (
+              <div className="theme-editor-plain-wrap">
+                <div className="theme-editor-plain-hint">{currentSection.hint}</div>
+                <textarea
+                  className="theme-plain-editor"
+                  value={currentValue}
+                  onChange={(e) => onEditorChange(e.target.value)}
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                />
+              </div>
+            )}
+          </section>
+        </div>
       </form>
     </div>
   )
