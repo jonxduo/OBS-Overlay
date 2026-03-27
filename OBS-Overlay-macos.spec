@@ -51,6 +51,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['/Users/francescomonti/Documenti/DEV/OBS_overlay/assets/icons/app.icns'],
 )
 coll = COLLECT(
     exe,
@@ -64,6 +65,6 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='OBS-Overlay-macos.app',
-    icon=None,
+    icon='/Users/francescomonti/Documenti/DEV/OBS_overlay/assets/icons/app.icns',
     bundle_identifier=None,
 )

@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = PROJECT_ROOT / "obs-panel"
 BACKEND_DIR = PROJECT_ROOT / "obs-overlay"
 ENTRYPOINT = BACKEND_DIR / "run_desktop.py"
+ICONS_DIR = PROJECT_ROOT / "assets" / "icons"
 
 
 def detect_target() -> str:
@@ -41,7 +42,19 @@ def build(target: str) -> None:
     run(["npm", "run", "build"], cwd=FRONTEND_DIR)
 
     # Ensure build tooling is available in current python env.
-    run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "pyinstaller"], cwd=BACKEND_DIR)
+    run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt", "pyinstaller", "pillow"], cwd=BACKEND_DIR)
+
+    # Generate app icons from root icon.png.
+    run([sys.executable, "scripts/prepare_icons.py"], cwd=PROJECT_ROOT)
+
+    icon_by_target = {
+        "macos": ICONS_DIR / "app.icns",
+        "windows": ICONS_DIR / "app.ico",
+        "linux": ICONS_DIR / "app.png",
+    }
+    icon_file = icon_by_target[target]
+    if not icon_file.exists():
+        raise RuntimeError(f"Icona mancante per target {target}: {icon_file}")
 
     data_sep = ";" if target == "windows" else ":"
     add_data = [
@@ -61,6 +74,8 @@ def build(target: str) -> None:
         "--clean",
         "--onedir",
         "--windowed",
+        "--icon",
+        str(icon_file),
         "--name",
         name,
         "--distpath",

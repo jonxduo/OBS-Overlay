@@ -96,6 +96,15 @@ E` disponibile uno script di build unico:
 ./.venv/bin/python scripts/build_desktop.py --target windows
 ```
 
+Icone applicazione:
+- Sorgente unica: `icon.png` nella root del repository.
+- Generazione automatica durante la build (o manuale con `./.venv/bin/python scripts/prepare_icons.py`).
+- Output icone in `assets/icons/`:
+	- `app.icns` (macOS)
+	- `app.ico` (Windows)
+	- `app.png` (Linux)
+- La build usa automaticamente l'icona corretta per il target selezionato.
+
 Output:
 - `dist/macos/OBS-Overlay-macos/`
 - `dist/linux/OBS-Overlay-linux/`

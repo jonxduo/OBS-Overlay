@@ -1,0 +1,57 @@
+{
+  "fields": [
+    {
+      "name": "title",
+      "label": "Titolo",
+      "type": "text",
+      "default": "Our website is under construction, we are working very hard to give you the best experience with this one."
+    },
+    {
+      "name": "hours",
+      "label": "Ore",
+      "type": "number",
+      "required": true,
+      "default": 0
+    },
+    {
+      "name": "minutes",
+      "label": "Minuti",
+      "type": "number",
+      "required": true,
+      "default": 5
+    },
+    {
+      "name": "seconds",
+      "label": "Secondi",
+      "type": "number",
+      "required": true,
+      "default": 0
+    },
+    {
+      "name": "show_hours",
+      "label": "Mostra ore",
+      "type": "checkbox",
+      "default": true
+    },
+    {
+      "name": "finish_behavior",
+      "label": "Fine countdown",
+      "type": "select",
+      "default": "hold",
+      "options": [
+        {
+          "label": "Hold (resta a 00)",
+          "value": "hold"
+        },
+        {
+          "label": "Reset (torna al valore iniziale)",
+          "value": "reset"
+        },
+        {
+          "label": "Stop (fermo su 00)",
+          "value": "stop"
+        }
+      ]
+    }
+  ]
+}
