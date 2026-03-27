@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   createCollection,
   createOverlay,
@@ -56,6 +57,7 @@ function coerceNestedItems(value) {
 }
 
 export function PanelPage() {
+  const location = useLocation()
   const [collections, setCollections] = useState([])
   const [overlays, setOverlays] = useState([])
   const [themes, setThemes] = useState([])
@@ -65,6 +67,11 @@ export function PanelPage() {
   const [newOverlayTitle, setNewOverlayTitle] = useState('')
   const [newOverlayThemeId, setNewOverlayThemeId] = useState('')
   const [overlayDrafts, setOverlayDrafts] = useState({})
+
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const forcedCollectionId = searchParams.get('collectionId')
+  const forcedCollectionTitle = searchParams.get('collectionTitle')
+  const isCollectionLocked = searchParams.get('lockCollection') === '1'
 
   const themeById = useMemo(() => {
     const map = new Map()
@@ -83,6 +90,7 @@ export function PanelPage() {
   }, [overlays])
 
   const selectedCollection = collections.find((c) => Number(c.id) === Number(selectedCollectionId))
+  const visibleCollections = collections.filter((collection) => collection.title !== '000-system')
   const selectedOverlays = (selectedCollection?.overlay_ids ?? [])
     .map((id) => overlaysById.get(Number(id)))
     .filter(Boolean)
@@ -101,6 +109,25 @@ export function PanelPage() {
 
     loadData().catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!collections.length) return
+
+    let forced = null
+
+    if (forcedCollectionId) {
+      forced = collections.find((collection) => String(collection.id) === String(forcedCollectionId)) ?? null
+    }
+
+    if (!forced && forcedCollectionTitle) {
+      forced = collections.find((collection) => collection.title === forcedCollectionTitle) ?? null
+    }
+
+    if (forced) {
+      setIsNewCollectionMode(false)
+      setSelectedCollectionId(String(forced.id))
+    }
+  }, [collections, forcedCollectionId, forcedCollectionTitle])
 
   useEffect(() => {
     const nextDrafts = {}
@@ -209,6 +236,7 @@ export function PanelPage() {
 
   async function onAddOverlay(event) {
     event.preventDefault()
+    if (selectedCollection?.title === '000-system' || isCollectionLocked) return
     if (!selectedCollection || !newOverlayThemeId || !newOverlayTitle.trim()) return
 
     try {
@@ -236,6 +264,7 @@ export function PanelPage() {
     <div className="panel-page">
       <div className="panel-header-row">
         <select
+          disabled={isCollectionLocked}
           value={isNewCollectionMode ? '__new__' : selectedCollectionId}
           onChange={(e) => {
             const next = e.target.value
@@ -249,14 +278,17 @@ export function PanelPage() {
           }}
         >
           <option value="">Seleziona collection...</option>
-          <option value="__new__">+ Crea nuova collection</option>
-          {collections.map((collection) => (
+          {!isCollectionLocked && <option value="__new__">+ Crea nuova collection</option>}
+          {selectedCollection?.title === '000-system' && (
+            <option value={selectedCollectionId}>000-system</option>
+          )}
+          {visibleCollections.map((collection) => (
             <option key={collection.id} value={collection.id}>
               {collection.title}
             </option>
           ))}
         </select>
-        {!!selectedCollectionId && (
+        {!!selectedCollectionId && !isCollectionLocked && (
           <button type="button" className="panel-btn panel-delete-btn" onClick={onDeleteCollection}>
             <i className="fa-solid fa-trash" />
           </button>
@@ -610,29 +642,32 @@ export function PanelPage() {
             )
           })}
 
-          <form className="panel-add-overlay" onSubmit={onAddOverlay}>
-            <input
-              value={newOverlayTitle}
-              onChange={(e) => setNewOverlayTitle(e.target.value)}
-              placeholder="Titolo overlay"
-              required
-            />
-            <select
-              value={newOverlayThemeId}
-              onChange={(e) => setNewOverlayThemeId(e.target.value)}
-              required
-            >
-              <option value="">Seleziona theme...</option>
-              {themes.map((theme) => (
-                <option key={theme.id} value={theme.id}>
-                  {theme.title}
-                </option>
-              ))}
-            </select>
-            <button type="submit" className="panel-btn">
-              Aggiungi
-            </button>
-          </form>
+          {selectedCollection?.title !== '000-system' && !isCollectionLocked && (
+            <form className="panel-add-overlay" onSubmit={onAddOverlay}>
+              <span className="panel-add-plus">+</span>
+              <input
+                value={newOverlayTitle}
+                onChange={(e) => setNewOverlayTitle(e.target.value)}
+                placeholder="Titolo overlay"
+                required
+              />
+              <select
+                value={newOverlayThemeId}
+                onChange={(e) => setNewOverlayThemeId(e.target.value)}
+                required
+              >
+                <option value="">Seleziona theme...</option>
+                {themes.map((theme) => (
+                  <option key={theme.id} value={theme.id}>
+                    {theme.title}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="panel-btn">
+                Aggiungi
+              </button>
+            </form>
+          )}
         </div>
       )}
     </div>

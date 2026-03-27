@@ -686,45 +686,14 @@ button:hover {
   background: #141b29;
 }
 
-.theme-plain-editor {
-  width: 100%;
-  height: 100%;
+.theme-monaco-wrap {
   min-height: 0;
-  padding: 12px;
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-  background: #0d1320;
-  color: #eaf0ff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
-  font-size: 11px;
-  line-height: 1.4;
-  resize: none;
-  outline: none;
-  overflow: auto;
-  white-space: pre;
-  tab-size: 2;
-  scrollbar-width: thin;
-  scrollbar-color: #405178 #121826;
+  height: 100%;
+  overflow: hidden;
 }
 
-.theme-plain-editor::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.theme-plain-editor::-webkit-scrollbar-track {
-  background: #121826;
-}
-
-.theme-plain-editor::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3f5076 0%, #31425f 100%);
-  border: 2px solid #121826;
-  border-radius: 999px;
-}
-
-.theme-plain-editor::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #5570a5 0%, #3f5a86 100%);
+.theme-monaco-wrap > div {
+  height: 100% !important;
 }
 
 .theme-preview-placeholder {
@@ -735,6 +704,48 @@ button:hover {
   justify-content: center;
   color: #93a1bb;
   font-size: 13px;
+}
+
+.theme-preview-split {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  background: #0f141f;
+}
+
+.theme-preview-form-pane {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #2a3142;
+  border-radius: 10px;
+  background: #1a1f2b;
+  padding: 8px;
+}
+
+.theme-preview-form-grid {
+  grid-template-columns: 1fr;
+}
+
+.theme-preview-actions-row {
+  margin-top: 8px;
+}
+
+.theme-preview-render-pane {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid #2a3142;
+  border-radius: 10px;
+  background: #0d1320;
+}
+
+.theme-preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
 }
 
 .panel-status {
@@ -767,6 +778,11 @@ button:hover {
 
   .theme-editor-layout {
     grid-template-columns: 1fr;
+  }
+
+  .theme-preview-split {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 36%) minmax(0, 1fr);
   }
 
   .theme-editor-sidebar {
