@@ -5,6 +5,7 @@ import {
   createOverlay,
   deleteCollection,
   deleteOverlay,
+  getApiWebSocketUrl,
   getCollections,
   getOverlays,
   getOverlayThemes,
@@ -25,6 +26,7 @@ export function PanelPage() {
   const [newOverlayTitle, setNewOverlayTitle] = useState('')
   const [newOverlayThemeId, setNewOverlayThemeId] = useState('')
   const [overlayDrafts, setOverlayDrafts] = useState({})
+  const [sourceListenerCounts, setSourceListenerCounts] = useState({})
   const [deleteHold, setDeleteHold] = useState({ overlayId: null, active: false, ready: false })
   const deleteHoldTimeoutRef = useRef(null)
 
@@ -105,6 +107,66 @@ export function PanelPage() {
       if (deleteHoldTimeoutRef.current) {
         clearTimeout(deleteHoldTimeoutRef.current)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+    let socket = null
+    let reconnectTimer = null
+
+    function connect() {
+      if (!alive) return
+      socket = new WebSocket(getApiWebSocketUrl())
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          const type = message?.type
+          const payload = message?.payload ?? {}
+
+          if (type === 'source_listener_snapshot') {
+            const snapshot = payload?.listeners ?? {}
+            if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+              setSourceListenerCounts(snapshot)
+            }
+            return
+          }
+
+          if (type === 'source_listener_changed') {
+            const overlayId = Number(payload?.overlay_id)
+            const count = Number(payload?.count ?? 0)
+            if (!Number.isFinite(overlayId) || overlayId <= 0) return
+            setSourceListenerCounts((prev) => {
+              const next = { ...prev }
+              if (count > 0) {
+                next[String(overlayId)] = count
+              } else {
+                delete next[String(overlayId)]
+              }
+              return next
+            })
+          }
+        } catch {
+        }
+      }
+
+      socket.onclose = () => {
+        if (!alive) return
+        reconnectTimer = setTimeout(connect, 1200)
+      }
+
+      socket.onerror = () => {
+        socket?.close()
+      }
+    }
+
+    connect()
+
+    return () => {
+      alive = false
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      socket?.close()
     }
   }, [])
 
@@ -341,11 +403,16 @@ export function PanelPage() {
             const draft = overlayDrafts[overlay.id] ?? {}
             const theme = themeById.get(Number(overlay.overlay_theme_id))
             const fields = normalizeThemeFields(theme?.config_params, draft)
+            const sourceListening = Number(sourceListenerCounts[String(overlay.id)] ?? 0) > 0
             return (
               <details className="panel-accordion" key={overlay.id}>
                 <summary>
                   <span className="panel-accordion-title">{overlay.title ?? `Overlay ${overlay.id}`}</span>
                   <span className="panel-summary-actions">
+                    <span
+                      className={`panel-source-led ${sourceListening ? 'on' : 'off'}`}
+                      title={sourceListening ? 'Source in ascolto' : 'Nessun source in ascolto'}
+                    />
                     <button
                       type="button"
                       className="panel-btn"

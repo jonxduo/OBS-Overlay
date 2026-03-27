@@ -37,6 +37,13 @@ export function SourcePage() {
       if (!mounted || !id) return
       socket = new WebSocket(getApiWebSocketUrl())
 
+      socket.onopen = () => {
+        try {
+          socket?.send(JSON.stringify({ type: 'source_listen', overlay_id: Number(id) }))
+        } catch {
+        }
+      }
+
       socket.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data)
