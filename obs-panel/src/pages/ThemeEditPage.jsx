@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import MonacoEditor from '@monaco-editor/react'
 import {
@@ -11,6 +11,7 @@ import {
   updateCollection,
   updateOverlayTheme
 } from '../api'
+import { coerceNestedItems, getFieldDefaultValue, getNestedDefaultItem, normalizeThemeFields } from '../utils/themeFields'
 
 const SECTIONS = [
   { key: 'panel', label: 'panel', field: 'config_params', hint: 'JSON config params', language: 'json' },
@@ -19,61 +20,6 @@ const SECTIONS = [
   { key: 'functions', label: 'functions.js', field: 'js', hint: 'Funzioni JavaScript overlay', language: 'javascript' },
   { key: 'preview', label: 'preview', field: null, hint: 'Anteprima non disponibile' }
 ]
-
-function normalizeThemeFields(configParams, fallbackConfig) {
-  if (Array.isArray(configParams?.fields)) {
-    return configParams.fields
-  }
-
-  return Object.keys(fallbackConfig ?? {}).map((key) => ({
-    name: key,
-    label: key,
-    type: typeof fallbackConfig[key] === 'number' ? 'number' : 'text'
-  }))
-}
-
-function getNestedDefaultItem(field) {
-  const itemFields = Array.isArray(field?.item?.fields) ? field.item.fields : []
-  const next = {}
-  for (const itemField of itemFields) {
-    const key = itemField?.name
-    if (!key) continue
-    if (itemField.default != null) {
-      next[key] = itemField.default
-    } else if (itemField.type === 'number') {
-      next[key] = 0
-    } else if (itemField.type === 'checkbox') {
-      next[key] = false
-    } else {
-      next[key] = ''
-    }
-  }
-  return next
-}
-
-function coerceNestedItems(value) {
-  if (Array.isArray(value)) {
-    return value
-  }
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
-
-function getFieldDefaultValue(field) {
-  if (field?.default != null) return field.default
-  const type = field?.type || 'text'
-  if (type === 'number') return 0
-  if (type === 'checkbox') return false
-  if (type === 'nested') return []
-  return ''
-}
 
 function ensurePreviewDefaults(fields, config) {
   const source = config ?? {}

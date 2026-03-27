@@ -1,0 +1,111 @@
+:root{
+  --bg:#111;
+  --cycle:13s;
+}
+
+*{ box-sizing:border-box; }
+
+html, body{
+  margin:0;
+  width:100%;
+  height:100%;
+}
+
+.page{
+  position:fixed;
+  inset:0;
+  display:grid;
+  place-items:center; /* centro perfetto X/Y */
+  background:var(--bg);
+  overflow:hidden;
+}
+
+.wrap{
+  width:min(72vw, 420px);
+  aspect-ratio:279/269;
+}
+
+.logo{
+  width:100%;
+  height:100%;
+  display:block;
+  overflow:visible;
+  transform-origin:50% 60%;
+  animation: logoPulse var(--cycle) linear infinite;
+}
+
+/* stato iniziale */
+#Curva-1,#Curva-2,#Curva-3,
+#Cerchio-1,#Cerchio-2,#Cerchio-3{
+  opacity:0;
+}
+
+/* barre */
+#Curva-1{ transform-box:fill-box; transform-origin:50% 100%; animation: curva1 var(--cycle) ease-in-out infinite; }
+#Curva-2{ transform-box:fill-box; transform-origin:50% 100%; animation: curva2 var(--cycle) ease-in-out infinite; }
+#Curva-3{ transform-box:fill-box; transform-origin:50% 100%; animation: curva3 var(--cycle) ease-in-out infinite; }
+
+/* pallini */
+#Cerchio-1{ transform-box:fill-box; transform-origin:50% 50%; animation: dot1 var(--cycle) ease-in-out infinite; }
+#Cerchio-2{ transform-box:fill-box; transform-origin:50% 50%; animation: dot2 var(--cycle) ease-in-out infinite; }
+#Cerchio-3{ transform-box:fill-box; transform-origin:50% 50%; animation: dot3 var(--cycle) ease-in-out infinite; }
+
+/* animazione globale */
+@keyframes logoPulse{
+  0%   { transform:scale(.92); }
+  12%  { transform:scale(1.02); }
+  16%  { transform:scale(1); }
+  84%  { transform:scale(1); }
+  90%  { transform:scale(.98); }
+  100% { transform:scale(.94); }
+}
+
+/* ingresso -> visibile -> uscita -> nascosto */
+@keyframes curva1{
+  0%   { opacity:0; transform:translateY(48px) scaleY(.75); }
+  8%   { opacity:1; transform:translateY(-5px) scaleY(1.08); }
+  12%  { opacity:1; transform:translateY(0) scaleY(1); }
+  84%  { opacity:1; transform:translateY(0) scaleY(1); }
+  92%  { opacity:0; transform:translateY(-18px) scale(.94); }
+  100% { opacity:0; transform:translateY(24px) scale(.9); }
+}
+@keyframes curva2{
+  0%   { opacity:0; transform:translateY(62px) scaleY(.66); }
+  9%   { opacity:1; transform:translateY(-8px) scaleY(1.12); }
+  13%  { opacity:1; transform:translateY(0) scaleY(1); }
+  84%  { opacity:1; transform:translateY(0) scaleY(1); }
+  92%  { opacity:0; transform:translateY(-22px) scale(.93); }
+  100% { opacity:0; transform:translateY(28px) scale(.88); }
+}
+@keyframes curva3{
+  0%   { opacity:0; transform:translateY(48px) scaleY(.75); }
+  10%  { opacity:1; transform:translateY(-5px) scaleY(1.08); }
+  14%  { opacity:1; transform:translateY(0) scaleY(1); }
+  84%  { opacity:1; transform:translateY(0) scaleY(1); }
+  92%  { opacity:0; transform:translateY(-18px) scale(.94); }
+  100% { opacity:0; transform:translateY(24px) scale(.9); }
+}
+@keyframes dot1{
+  0%   { opacity:0; transform:translateY(18px) scale(.1); }
+  12%  { opacity:1; transform:translateY(-4px) scale(1.18); }
+  15%  { opacity:1; transform:translateY(0) scale(1); }
+  84%  { opacity:1; transform:translateY(0) scale(1); }
+  92%  { opacity:0; transform:translateY(-14px) scale(.65); }
+  100% { opacity:0; transform:translateY(10px) scale(.3); }
+}
+@keyframes dot2{
+  0%   { opacity:0; transform:translateY(22px) scale(.1); }
+  13%  { opacity:1; transform:translateY(-6px) scale(1.2); }
+  16%  { opacity:1; transform:translateY(0) scale(1); }
+  84%  { opacity:1; transform:translateY(0) scale(1); }
+  92%  { opacity:0; transform:translateY(-16px) scale(.65); }
+  100% { opacity:0; transform:translateY(12px) scale(.3); }
+}
+@keyframes dot3{
+  0%   { opacity:0; transform:translateY(18px) scale(.1); }
+  14%  { opacity:1; transform:translateY(-4px) scale(1.18); }
+  17%  { opacity:1; transform:translateY(0) scale(1); }
+  84%  { opacity:1; transform:translateY(0) scale(1); }
+  92%  { opacity:0; transform:translateY(-14px) scale(.65); }
+  100% { opacity:0; transform:translateY(10px) scale(.3); }
+}

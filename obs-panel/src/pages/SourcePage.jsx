@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getOverlay, getOverlayTheme } from '../api'
+import { getApiWebSocketUrl, getOverlay, getOverlayTheme } from '../api'
 
 export function SourcePage() {
   const { id } = useParams()
@@ -29,10 +29,51 @@ export function SourcePage() {
     }
 
     loadOverlayAndTheme()
-    const timer = setInterval(loadOverlayAndTheme, 700)
+
+    let socket = null
+    let reconnectTimer = null
+
+    function connect() {
+      if (!mounted || !id) return
+      socket = new WebSocket(getApiWebSocketUrl())
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          const type = message?.type
+          const payload = message?.payload ?? {}
+          const eventOverlayId = Number(payload?.id)
+
+          if (type === 'overlay_updated' || type === 'overlay_created' || type === 'overlay_deleted') {
+            if (eventOverlayId === Number(id)) {
+              loadOverlayAndTheme()
+            }
+            return
+          }
+
+          if (type === 'overlay_theme_updated') {
+            loadOverlayAndTheme()
+          }
+        } catch {
+        }
+      }
+
+      socket.onclose = () => {
+        if (!mounted) return
+        reconnectTimer = setTimeout(connect, 1200)
+      }
+
+      socket.onerror = () => {
+        socket?.close()
+      }
+    }
+
+    connect()
+
     return () => {
       mounted = false
-      clearInterval(timer)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      socket?.close()
     }
   }, [id])
 

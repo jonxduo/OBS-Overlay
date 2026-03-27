@@ -365,8 +365,31 @@ button:hover {
   font-weight: 600;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+}
+
+.panel-accordion-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-summary-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.panel-summary-actions .panel-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .panel-box {
@@ -510,6 +533,49 @@ button:hover {
 
 .panel-delete-btn:hover {
   background: #8e2f46;
+}
+
+.panel-delete-hold-btn {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  min-height: 34px;
+}
+
+.panel-delete-hold-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(195, 45, 67, 0.9), rgba(228, 57, 82, 0.95));
+  z-index: 0;
+}
+
+.panel-delete-hold-btn.holding::before {
+  animation: panelDeleteHoldFill 5s linear forwards;
+}
+
+.panel-delete-hold-btn.ready::before {
+  width: 100%;
+  animation: none;
+}
+
+.panel-delete-hold-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+@keyframes panelDeleteHoldFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 .panel-add-overlay {

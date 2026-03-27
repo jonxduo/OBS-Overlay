@@ -1,5 +1,16 @@
 const apiBase = import.meta.env.VITE_API_BASE ?? 'http://127.0.0.1:8000/api'
 
+export function getApiWebSocketUrl() {
+  try {
+    const baseUrl = new URL(apiBase, window.location.origin)
+    const protocol = baseUrl.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${baseUrl.host}/ws`
+  } catch {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}/ws`
+  }
+}
+
 async function parseResponse(res) {
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

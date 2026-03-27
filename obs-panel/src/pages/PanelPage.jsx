@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
   createCollection,
@@ -11,62 +11,22 @@ import {
   updateCollection,
   updateOverlay
 } from '../api'
-
-function normalizeThemeFields(configParams, fallbackConfig) {
-  if (Array.isArray(configParams?.fields)) {
-    return configParams.fields
-  }
-
-  return Object.keys(fallbackConfig ?? {}).map((key) => ({
-    name: key,
-    label: key,
-    type: typeof fallbackConfig[key] === 'number' ? 'number' : 'text'
-  }))
-}
-
-function getNestedDefaultItem(field) {
-  const itemFields = Array.isArray(field?.item?.fields) ? field.item.fields : []
-  const next = {}
-  for (const itemField of itemFields) {
-    const key = itemField?.name
-    if (!key) continue
-    if (itemField.default != null) {
-      next[key] = itemField.default
-    } else if (itemField.type === 'number') {
-      next[key] = 0
-    } else {
-      next[key] = ''
-    }
-  }
-  return next
-}
-
-function coerceNestedItems(value) {
-  if (Array.isArray(value)) {
-    return value
-  }
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-  return []
-}
+import { coerceNestedItems, getNestedDefaultItem, normalizeThemeFields } from '../utils/themeFields'
 
 export function PanelPage() {
   const location = useLocation()
   const [collections, setCollections] = useState([])
   const [overlays, setOverlays] = useState([])
   const [themes, setThemes] = useState([])
+  const [status, setStatus] = useState('')
   const [selectedCollectionId, setSelectedCollectionId] = useState('')
   const [isNewCollectionMode, setIsNewCollectionMode] = useState(false)
   const [newCollectionTitle, setNewCollectionTitle] = useState('')
   const [newOverlayTitle, setNewOverlayTitle] = useState('')
   const [newOverlayThemeId, setNewOverlayThemeId] = useState('')
   const [overlayDrafts, setOverlayDrafts] = useState({})
+  const [deleteHold, setDeleteHold] = useState({ overlayId: null, active: false, ready: false })
+  const deleteHoldTimeoutRef = useRef(null)
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search])
   const forcedCollectionId = searchParams.get('collectionId')
@@ -105,9 +65,12 @@ export function PanelPage() {
       setCollections(collectionData)
       setOverlays(overlayData)
       setThemes(themeData)
+      setStatus('')
     }
 
-    loadData().catch(() => {})
+    loadData().catch((err) => {
+      setStatus(`Errore caricamento dati panel: ${err.message}`)
+    })
   }, [])
 
   useEffect(() => {
@@ -137,6 +100,55 @@ export function PanelPage() {
     setOverlayDrafts(nextDrafts)
   }, [selectedCollectionId, overlays])
 
+  useEffect(() => {
+    return () => {
+      if (deleteHoldTimeoutRef.current) {
+        clearTimeout(deleteHoldTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  function clearDeleteHold() {
+    if (deleteHoldTimeoutRef.current) {
+      clearTimeout(deleteHoldTimeoutRef.current)
+      deleteHoldTimeoutRef.current = null
+    }
+    setDeleteHold({ overlayId: null, active: false, ready: false })
+  }
+
+  function startDeleteHold(overlayId, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (deleteHoldTimeoutRef.current) {
+      clearTimeout(deleteHoldTimeoutRef.current)
+    }
+    event.currentTarget.setPointerCapture?.(event.pointerId)
+    setDeleteHold({ overlayId, active: true, ready: false })
+    deleteHoldTimeoutRef.current = setTimeout(() => {
+      setDeleteHold((prev) => {
+        if (!prev.active || prev.overlayId !== overlayId) return prev
+        return { ...prev, ready: true }
+      })
+    }, 5000)
+  }
+
+  function cancelDeleteHold(overlayId, event) {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
+    if (deleteHold.overlayId !== overlayId || !deleteHold.active) return
+    clearDeleteHold()
+  }
+
+  async function finishDeleteHold(overlayId, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    const canDelete = deleteHold.overlayId === overlayId && deleteHold.active && deleteHold.ready
+    clearDeleteHold()
+    if (canDelete) {
+      await onDeleteOverlay(overlayId)
+    }
+  }
+
   async function onCreateCollection(event) {
     event.preventDefault()
     if (!newCollectionTitle.trim()) return
@@ -148,7 +160,9 @@ export function PanelPage() {
       setSelectedCollectionId(String(created.id))
       setIsNewCollectionMode(false)
       setNewCollectionTitle('')
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore creazione collection: ${err.message}`)
     }
   }
 
@@ -173,7 +187,9 @@ export function PanelPage() {
         config: nextConfig
       }
       await updateOverlay(overlayId, payload)
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore salvataggio overlay ${overlayId}: ${err.message}`)
     }
   }
 
@@ -201,7 +217,9 @@ export function PanelPage() {
         overlay_theme_id: Number(overlay.overlay_theme_id),
         config: next
       })
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore azione ${action} su overlay ${overlayId}: ${err.message}`)
     }
   }
 
@@ -212,7 +230,9 @@ export function PanelPage() {
       const collectionData = await getCollections()
       setCollections(collectionData)
       setSelectedCollectionId('')
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore eliminazione collection: ${err.message}`)
     }
   }
 
@@ -230,7 +250,9 @@ export function PanelPage() {
       const [collectionData, overlayData] = await Promise.all([getCollections(), getOverlays()])
       setCollections(collectionData)
       setOverlays(overlayData)
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore eliminazione overlay ${overlayId}: ${err.message}`)
     }
   }
 
@@ -256,7 +278,9 @@ export function PanelPage() {
       setOverlays(overlayData)
       setNewOverlayTitle('')
       setNewOverlayThemeId('')
-    } catch {
+      setStatus('')
+    } catch (err) {
+      setStatus(`Errore creazione overlay: ${err.message}`)
     }
   }
 
@@ -320,23 +344,71 @@ export function PanelPage() {
             return (
               <details className="panel-accordion" key={overlay.id}>
                 <summary>
-                  <span>{overlay.title ?? `Overlay ${overlay.id}`}</span>
-                  <button
-                    type="button"
-                    className="panel-btn panel-delete-btn"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      onDeleteOverlay(overlay.id)
-                    }}
-                  >
-                    <i className="fa-solid fa-trash" />
-                  </button>
+                  <span className="panel-accordion-title">{overlay.title ?? `Overlay ${overlay.id}`}</span>
+                  <span className="panel-summary-actions">
+                    <button
+                      type="button"
+                      className="panel-btn"
+                      aria-label="Start"
+                      title="Start"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyAction(overlay.id, 'start')
+                      }}
+                    >
+                      <i className="fa-solid fa-play" />
+                    </button>
+                    <button
+                      type="button"
+                      className="panel-btn"
+                      aria-label="Stop"
+                      title="Stop"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyAction(overlay.id, 'stop')
+                      }}
+                    >
+                      <i className="fa-solid fa-stop" />
+                    </button>
+                    <button
+                      type="button"
+                      className="panel-btn"
+                      aria-label="Restart"
+                      title="Restart"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        applyAction(overlay.id, 'restart')
+                      }}
+                    >
+                      <i className="fa-solid fa-rotate-right" />
+                    </button>
+                  </span>
                 </summary>
 
                 <div className="panel-box">
                   <button type="button" className="panel-btn" onClick={() => copySourceUrl(overlay.id)}>
                     <i className="fa-solid fa-link" /> Copia source url
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`panel-btn panel-delete-btn panel-delete-hold-btn ${
+                      deleteHold.overlayId === overlay.id && deleteHold.active ? 'holding' : ''
+                    } ${deleteHold.overlayId === overlay.id && deleteHold.ready ? 'ready' : ''}`}
+                    onPointerDown={(e) => startDeleteHold(overlay.id, e)}
+                    onPointerUp={(e) => finishDeleteHold(overlay.id, e)}
+                    onPointerLeave={(e) => cancelDeleteHold(overlay.id, e)}
+                    onPointerCancel={(e) => cancelDeleteHold(overlay.id, e)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    aria-label="Elimina overlay (pressione lunga 5 secondi)"
+                    title="Tieni premuto 5 secondi, poi rilascia per eliminare"
+                  >
+                    <span className="panel-delete-hold-label">
+                      <i className="fa-solid fa-trash" /> Elimina overlay (tieni premuto 5s)
+                    </span>
                   </button>
 
                   <div className="panel-form-grid">
@@ -626,17 +698,6 @@ export function PanelPage() {
                     })}
                   </div>
 
-                  <div className="panel-actions-row">
-                    <button type="button" className="panel-btn" onClick={() => applyAction(overlay.id, 'start')}>
-                      <i className="fa-solid fa-play" /> Start
-                    </button>
-                    <button type="button" className="panel-btn" onClick={() => applyAction(overlay.id, 'stop')}>
-                      <i className="fa-solid fa-stop" /> Stop
-                    </button>
-                    <button type="button" className="panel-btn" onClick={() => applyAction(overlay.id, 'restart')}>
-                      <i className="fa-solid fa-rotate-right" /> Restart
-                    </button>
-                  </div>
                 </div>
               </details>
             )
@@ -670,6 +731,8 @@ export function PanelPage() {
           )}
         </div>
       )}
+
+      {status && <p className="status">{status}</p>}
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import JSZip from 'jszip'
 import {
   createOverlayTheme,
   deleteOverlayTheme,
+  getApiWebSocketUrl,
   getOverlayThemes,
   getRtmpStatus,
   startRtmpServer,
@@ -25,6 +27,90 @@ export function HomePage() {
   })
   const importInputRef = useRef(null)
   const panelUrl = `${window.location.origin}/panel`
+
+  function validateConfigParams(value) {
+    if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('panel.json non valido: deve essere un oggetto JSON')
+    }
+    return value
+  }
+
+  function validateHtml(value) {
+    const html = String(value ?? '')
+    if (!html.trim()) {
+      throw new Error('index.html vuoto')
+    }
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    if (!doc || !doc.documentElement) {
+      throw new Error('index.html non valido')
+    }
+    return html
+  }
+
+  function validateCss(value) {
+    const css = String(value ?? '')
+    if (!css.trim()) {
+      throw new Error('style.css vuoto')
+    }
+    if (typeof CSSStyleSheet !== 'undefined') {
+      const sheet = new CSSStyleSheet()
+      sheet.replaceSync(css)
+    }
+    return css
+  }
+
+  function validateJs(value) {
+    const js = String(value ?? '')
+    if (!js.trim()) {
+      throw new Error('functions.js vuoto')
+    }
+    // Validate syntax without executing.
+    new Function(js)
+    return js
+  }
+
+  async function readZipTheme(file) {
+    const zip = await JSZip.loadAsync(file)
+    const names = Object.keys(zip.files)
+    const byBasename = new Map()
+    for (const name of names) {
+      const entry = zip.files[name]
+      if (entry.dir) continue
+      const base = name.split('/').pop()?.toLowerCase()
+      if (base) byBasename.set(base, entry)
+    }
+
+    const panelEntry = byBasename.get('panel.json')
+    const htmlEntry = byBasename.get('index.html')
+    const cssEntry = byBasename.get('style.css')
+    const jsEntry = byBasename.get('functions.js') ?? byBasename.get('funcion.js')
+
+    if (!panelEntry || !htmlEntry || !cssEntry || !jsEntry) {
+      throw new Error('ZIP non valido: richiesti panel.json, index.html, style.css, functions.js')
+    }
+
+    const panelText = await panelEntry.async('string')
+    const htmlText = await htmlEntry.async('string')
+    const cssText = await cssEntry.async('string')
+    const jsText = await jsEntry.async('string')
+
+    let parsedPanel
+    try {
+      parsedPanel = JSON.parse(panelText)
+    } catch {
+      throw new Error('panel.json non valido: JSON malformato')
+    }
+
+    const title = file.name.replace(/\.[^.]+$/, '') || 'Imported Theme'
+
+    return {
+      title,
+      config_params: validateConfigParams(parsedPanel),
+      html: validateHtml(htmlText),
+      css: validateCss(cssText),
+      js: validateJs(jsText)
+    }
+  }
 
   function hasRtmpChanged(prev, next) {
     return (
@@ -57,27 +143,48 @@ export function HomePage() {
 
   useEffect(() => {
     let alive = true
+    let socket = null
+    let reconnectTimer = null
 
-    async function pollRtmpStatus() {
-      try {
-        const statusData = await getRtmpStatus()
-        if (alive) {
-          setRtmpInfo((prev) => (hasRtmpChanged(prev, statusData) ? statusData : prev))
+    function connect() {
+      if (!alive) return
+      const wsUrl = getApiWebSocketUrl()
+      socket = new WebSocket(wsUrl)
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data)
+          const type = message?.type
+          const payload = message?.payload ?? {}
+
+          if (type === 'rtmp_status') {
+            setRtmpInfo((prev) => (hasRtmpChanged(prev, payload) ? payload : prev))
+            return
+          }
+
+          if (type === 'overlay_theme_created' || type === 'overlay_theme_updated' || type === 'overlay_theme_deleted') {
+            loadThemes().catch(() => {})
+          }
+        } catch {
         }
-      } catch {
-        if (alive) {
-          setRtmpInfo((prev) => {
-            if (!prev.running && !prev.ingest_active) return prev
-            return { ...prev, running: false, ingest_active: false }
-          })
-        }
+      }
+
+      socket.onclose = () => {
+        if (!alive) return
+        reconnectTimer = setTimeout(connect, 1200)
+      }
+
+      socket.onerror = () => {
+        socket?.close()
       }
     }
 
-    const id = setInterval(pollRtmpStatus, 1500)
+    connect()
+
     return () => {
       alive = false
-      clearInterval(id)
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      socket?.close()
     }
   }, [])
 
@@ -126,12 +233,16 @@ export function HomePage() {
 
   async function onImportThemePayload(payload) {
     try {
+      const configParams = validateConfigParams(payload.config_params ?? {})
+      const html = validateHtml(payload.html ?? '')
+      const css = validateCss(payload.css ?? '')
+      const js = validateJs(payload.js ?? '')
       await createOverlayTheme({
-        title: payload.title,
-        config_params: payload.config_params ?? {},
-        html: payload.html ?? '',
-        css: payload.css ?? '',
-        js: payload.js ?? ''
+        title: String(payload.title || '').trim() || 'Imported Theme',
+        config_params: configParams,
+        html,
+        css,
+        js
       })
       await loadThemes()
       setStatus('Theme importato')
@@ -150,9 +261,15 @@ export function HomePage() {
     if (!file) return
 
     try {
-      const text = await file.text()
-      const payload = JSON.parse(text)
-      await onImportThemePayload(payload)
+      const lowerName = file.name.toLowerCase()
+      if (lowerName.endsWith('.zip')) {
+        const payload = await readZipTheme(file)
+        await onImportThemePayload(payload)
+      } else {
+        const text = await file.text()
+        const payload = JSON.parse(text)
+        await onImportThemePayload(payload)
+      }
     } catch (err) {
       setStatus(`Errore import file: ${err.message}`)
     }
@@ -251,7 +368,7 @@ export function HomePage() {
             <input
               ref={importInputRef}
               type="file"
-              accept="application/json,.json"
+              accept="application/json,.json,application/zip,.zip"
               className="hidden-file-input"
               onChange={onImportFileChange}
             />
